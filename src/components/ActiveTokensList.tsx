@@ -1,163 +1,175 @@
 import React from 'react';
-import { Ticket, QrCode, Trash2, Printer, CheckCircle2, GraduationCap, Briefcase, Plus } from 'lucide-react';
 import { GeneratedToken } from '../types';
+import { 
+  Ticket, 
+  Clock, 
+  Printer, 
+  Volume2, 
+  Trash2, 
+  CheckCircle2, 
+  AlertCircle, 
+  QrCode, 
+  ExternalLink 
+} from 'lucide-react';
+import { announceTokenSpeech } from '../utils/soundEffects';
 
 interface ActiveTokensListProps {
   tokens: GeneratedToken[];
-  onDeleteToken: (id: string) => void;
-  onGenerateNew: () => void;
+  onCancelToken: (tokenId: string) => void;
+  onOpenTokenModal: () => void;
+  onPrintToken: (token: GeneratedToken) => void;
 }
 
 export const ActiveTokensList: React.FC<ActiveTokensListProps> = ({
   tokens,
-  onDeleteToken,
-  onGenerateNew,
+  onCancelToken,
+  onOpenTokenModal,
+  onPrintToken,
 }) => {
-  if (tokens.length === 0) return null;
-
-  return (
-    <section className="bg-amber-50/60 border-y border-amber-200/80 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Ticket className="w-5 h-5 text-[#7b1122]" />
-              <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                Your Saved Cashless Tokens ({tokens.length})
-              </h2>
-            </div>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Collected online without paying • Show these tokens at the campus dining counters
-            </p>
+  if (tokens.length === 0) {
+    return (
+      <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-white p-8 text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto">
+            <Ticket className="w-6 h-6" />
           </div>
-
+          <h3 className="text-base font-bold text-slate-800">
+            No Active Food Tokens Generated Yet
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Select items from the SB Canteen menu to generate your instant digital food token pass.
+          </p>
           <button
-            onClick={onGenerateNew}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#7b1122] text-white text-xs font-semibold hover:bg-[#600d1a] shadow-xs"
+            type="button"
+            onClick={onOpenTokenModal}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer mt-2"
           >
-            <Plus className="w-4 h-4" />
-            <span>Generate Another Token</span>
+            <Ticket className="w-4 h-4 text-slate-950" />
+            <span>Generate Food Token Now</span>
           </button>
         </div>
+      </div>
+    );
+  }
 
-        {/* Grid of Tokens */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tokens.map((token) => (
-            <div
-              key={token.id}
-              className="bg-white rounded-2xl border-2 border-amber-300 p-4 shadow-sm relative overflow-hidden flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                        token.role === 'student'
-                          ? 'bg-sky-100 text-sky-800'
-                          : 'bg-purple-100 text-purple-800'
-                      }`}
-                    >
-                      {token.role === 'student' ? (
-                        <>
-                          <GraduationCap className="w-3 h-3" />
-                          <span>STUDENT (വിദ്യാർത്ഥി)</span>
-                        </>
-                      ) : (
-                        <>
-                          <Briefcase className="w-3 h-3" />
-                          <span>STAFF (ജീവനക്കാർ)</span>
-                        </>
-                      )}
-                    </span>
-                  </div>
+  return (
+    <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
+            Your Active Campus Tokens ({tokens.length})
+          </h3>
+        </div>
+        <span className="text-xs text-slate-400 font-medium">
+          Show token at collection counter
+        </span>
+      </div>
 
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {token.timestamp.split('•')[1] || token.timestamp}
-                  </span>
-                </div>
-
-                {/* Token Badge */}
-                <div className="bg-slate-900 text-white p-3 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="text-[9px] uppercase tracking-wider text-amber-400 font-bold block">
-                      Token Pass ID
-                    </span>
-                    <span className="text-xl font-mono font-extrabold text-amber-300">
-                      {token.tokenNumber}
-                    </span>
-                  </div>
-                  <div className="p-1.5 bg-white rounded text-slate-900">
-                    <QrCode className="w-6 h-6" />
-                  </div>
-                </div>
-
-                {/* Beneficiary */}
-                <div className="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-0.5">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Name:</span>
-                    <strong className="text-slate-800">{token.personName}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">
-                      {token.role === 'student' ? 'Roll / Class:' : 'Dept / ID:'}
-                    </span>
-                    <span className="text-slate-700 font-medium">{token.personIdentifier}</span>
-                  </div>
-                  <div className="flex justify-between pt-1 border-t border-slate-200/60">
-                    <span className="text-slate-500">Counter:</span>
-                    <strong className="text-[#7b1122]">{token.counter}</strong>
-                  </div>
-                </div>
-
-                {/* Items */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
-                    Items:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {token.items.map((item, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100/60 text-amber-950 text-xs border border-amber-200"
-                      >
-                        <span className="font-semibold">{item.nameMalayalam}</span>
-                        <span className="text-slate-600">({item.name})</span>
-                        <span className="font-bold text-[#7b1122]">x{item.quantity}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {tokens.map((token) => (
+          <div
+            key={token.id}
+            className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
+          >
+            {/* Card Header (Red & Gold Campus Branding) */}
+            <div className="bg-gradient-to-r from-[#7b1122] to-[#550b17] text-white p-4 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                  SB Central Canteen
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                    token.role === 'student'
+                      ? 'bg-amber-400 text-slate-950'
+                      : 'bg-white text-[#7b1122]'
+                  }`}
+                >
+                  {token.role === 'student' ? 'Student' : 'Faculty/Staff'}
+                </span>
               </div>
 
-              {/* Card Footer */}
-              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-emerald-700 font-semibold flex items-center gap-1 text-[11px]">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  Cashless Online Pass
+              {/* Big Token Number */}
+              <div className="flex items-baseline justify-between pt-1">
+                <span className="font-mono font-black text-2xl tracking-tight text-white">
+                  {token.tokenNumber}
                 </span>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => window.print()}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                    title="Print Token"
-                  >
-                    <Printer className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => onDeleteToken(token.id)}
-                    className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
-                    title="Remove Token"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <span className="text-xs font-semibold text-amber-200">
+                  {token.counter}
+                </span>
               </div>
             </div>
-          ))}
-        </div>
+
+            {/* Token Content */}
+            <div className="p-4 space-y-3 grow">
+              {/* Holder details */}
+              <div className="text-xs flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="font-bold text-slate-800">{token.personName}</span>
+                <span className="font-mono text-slate-500">{token.personIdentifier}</span>
+              </div>
+
+              {/* Items breakdown */}
+              <div className="space-y-1 text-xs">
+                {token.items.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-slate-700">
+                    <span className="truncate pr-2">
+                      <strong className="text-slate-900 font-bold">{item.quantity}x</strong> {item.name}
+                    </span>
+                    <span className="font-semibold shrink-0">₹{item.price * item.quantity}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total Price */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase">Total Amount</span>
+                <span className="text-lg font-black text-[#7b1122]">₹{token.totalAmount}</span>
+              </div>
+
+              {/* Time Stamp */}
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Issued: {token.timestamp}</span>
+              </div>
+            </div>
+
+            {/* Actions Bar */}
+            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                {/* Print button */}
+                <button
+                  type="button"
+                  onClick={() => onPrintToken(token)}
+                  className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-white border border-slate-200 transition-colors"
+                  title="Print Token Pass"
+                >
+                  <Printer className="w-4 h-4" />
+                </button>
+
+                {/* Speech announcement */}
+                <button
+                  type="button"
+                  onClick={() => announceTokenSpeech(token.tokenNumber, token.counter)}
+                  className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-white border border-slate-200 transition-colors"
+                  title="Announce token over speaker"
+                >
+                  <Volume2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Cancel / Delete token */}
+              <button
+                type="button"
+                onClick={() => onCancelToken(token.id)}
+                className="px-3 py-1.5 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center gap-1 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Cancel</span>
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
-    </section>
+    </div>
   );
 };

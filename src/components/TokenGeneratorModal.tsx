@@ -1,752 +1,551 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ALL_MENU_ITEMS } from '../data/menuData';
+import { GeneratedToken, MenuItem, TokenItem, UserRole } from '../types';
 import { 
   X, 
   Ticket, 
-  GraduationCap, 
-  Briefcase, 
-  Check, 
-  UtensilsCrossed, 
-  Coffee, 
   Plus, 
   Minus, 
-  ArrowRight, 
-  QrCode, 
+  User, 
+  GraduationCap, 
+  Briefcase, 
+  UtensilsCrossed, 
+  Coffee, 
+  IceCream, 
+  Check, 
   Printer, 
-  Download, 
-  CheckCircle2, 
   Sparkles,
-  ShieldAlert
+  Search,
+  Cookie,
+  Flame,
+  GlassWater
 } from 'lucide-react';
-import { UserRole, GeneratedToken, TokenItem } from '../types';
-import { ALL_MENU_ITEMS } from '../data/menuData';
+import { playOrderChime } from '../utils/soundEffects';
 
 interface TokenGeneratorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onTokenGenerated: (token: GeneratedToken) => void;
   initialRole?: UserRole;
-  preselectedItemId?: string;
+  preselectedItem?: MenuItem;
 }
+
+const DEPARTMENTS = [
+  'B.Sc Computer Science',
+  'BCA (Computer Applications)',
+  'B.Com Finance & Taxation',
+  'B.A English Literature',
+  'B.Sc Physics',
+  'B.Sc Chemistry',
+  'B.Sc Mathematics',
+  'B.A Economics',
+  'M.Sc Data Analytics',
+  'MBA (Management Studies)',
+  'Other Department / Faculty',
+];
 
 export const TokenGeneratorModal: React.FC<TokenGeneratorModalProps> = ({
   isOpen,
   onClose,
   onTokenGenerated,
-  initialRole,
-  preselectedItemId,
+  initialRole = 'student',
+  preselectedItem,
 }) => {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [role, setRole] = useState<UserRole>(initialRole || 'student');
+  const [step, setStep] = useState<'form' | 'success'>('form');
+  const [role, setRole] = useState<UserRole>(initialRole);
   const [personName, setPersonName] = useState('');
-  const [personIdentifier, setPersonIdentifier] = useState('');
-  const [facility, setFacility] = useState<'canteen' | 'cafeteria'>('canteen');
-  const [quantities, setQuantities] = useState<Record<string, number>>(() => {
-    if (preselectedItemId) {
-      return { [preselectedItemId]: 1 };
-    }
-    return {};
-  });
+  const [personId, setPersonId] = useState('');
+  const [department, setDepartment] = useState(DEPARTMENTS[0]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
   const [generatedToken, setGeneratedToken] = useState<GeneratedToken | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Auto-populate preselected item if provided
+  useEffect(() => {
+    if (preselectedItem) {
+      setSelectedItems({ [preselectedItem.id]: 1 });
+      if (preselectedItem.category) {
+        setSelectedCategory(preselectedItem.category);
+      }
+    }
+  }, [preselectedItem]);
 
   if (!isOpen) return null;
 
-  const handleRoleSelect = (selectedRole: UserRole) => {
-    setRole(selectedRole);
-  };
+  const filteredMenuItems = ALL_MENU_ITEMS.filter((item) => {
+    if (selectedCategory !== 'all' && item.category !== selectedCategory) {
+      return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = item.name.toLowerCase().includes(q);
+      const matchMal = item.nameMalayalam.includes(searchQuery);
+      if (!matchName && !matchMal) return false;
+    }
+    return true;
+  });
 
-  const handleQuantityChange = (itemId: string, delta: number) => {
-    setQuantities((prev) => {
+  const handleItemQuantityChange = (itemId: string, delta: number) => {
+    setSelectedItems((prev) => {
       const current = prev[itemId] || 0;
-      const next = Math.max(0, current + delta);
-      const updated = { ...prev };
-      if (next === 0) {
-        delete updated[itemId];
-      } else {
-        updated[itemId] = next;
+      const next = current + delta;
+      if (next <= 0) {
+        const copy = { ...prev };
+        delete copy[itemId];
+        return copy;
       }
-      return updated;
+      return { ...prev, [itemId]: next };
     });
   };
 
-  // Filter items matching the chosen facility
-  const availableItems = ALL_MENU_ITEMS.filter((item) => {
-    if (facility === 'cafeteria') {
-      return item.location === 'cafeteria' || item.id === 'tea' || item.id === 'coffee' || item.id === 'bakery-snacks';
-    }
-    return item.location === 'canteen' || item.location === 'both';
+  // Calculate items summary
+  const tokenItemsList: TokenItem[] = Object.entries(selectedItems).map(([id, qty]) => {
+    const item = ALL_MENU_ITEMS.find((m) => m.id === id)!;
+    return {
+      menuItemId: id,
+      name: item.name,
+      nameMalayalam: item.nameMalayalam,
+      quantity: Number(qty),
+      price: item.price,
+    };
   });
 
-  const selectedItemsList: TokenItem[] = Object.entries(quantities)
-    .map(([itemId, qty]) => {
-      const item = ALL_MENU_ITEMS.find((i) => i.id === itemId);
-      if (!item) return null;
-      const tokenItem: TokenItem = {
-        menuItemId: item.id,
-        name: item.name,
-        nameMalayalam: item.nameMalayalam,
-        quantity: Number(qty),
-        price: item.price,
-      };
-      return tokenItem;
-    })
-    .filter((i): i is TokenItem => Boolean(i && i.quantity > 0));
+  const totalAmount = tokenItemsList.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
 
-  const totalItemCount = selectedItemsList.reduce((sum, item) => sum + item.quantity, 0);
-  const totalEstimatedAmount = selectedItemsList.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
-
-  const handleGenerateToken = (e: React.FormEvent) => {
+  const handleGenerate = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!personName.trim()) {
-      alert('Please enter your name');
+    if (!personName.trim()) return;
+    if (tokenItemsList.length === 0) {
+      alert('Please select at least 1 food, snack, beverage or bakery item.');
       return;
     }
 
-    if (!personIdentifier.trim()) {
-      alert(
-        role === 'student'
-          ? 'Please enter your Class / Roll Number'
-          : 'Please enter your Department / Staff ID'
-      );
-      return;
-    }
-
-    if (selectedItemsList.length === 0) {
-      alert('Please select at least 1 food or beverage item for your token.');
-      return;
-    }
-
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const prefix = role === 'student' ? 'SB-STU' : 'SB-STF';
-    const tokenNumber = `${prefix}-${randomDigits}`;
+    const tokenNumber = `${prefix}-${randomSuffix}`;
 
-    // Determine counter
-    let counter = 'Main Canteen - Food Counter 1';
-    if (facility === 'cafeteria') {
-      counter = 'Cafeteria Express Kiosk Window';
-    } else if (
-      selectedItemsList.every((i) => ['tea', 'coffee', 'lemon-juice', 'milk-shakes', 'fresh-fruit-juices'].includes(i.menuItemId))
-    ) {
-      counter = 'Canteen Beverage & Juice Counter';
+    // Smart Counter allocation
+    const hasMeals = tokenItemsList.some(i => {
+      const it = ALL_MENU_ITEMS.find(m => m.id === i.menuItemId);
+      return it?.category === 'meals' || it?.category === 'breakfast';
+    });
+    const hasJuicesOrIceCream = tokenItemsList.some(i => {
+      const it = ALL_MENU_ITEMS.find(m => m.id === i.menuItemId);
+      return it?.category === 'juices' || it?.category === 'icecream';
+    });
+
+    let counter = 'Counter 2 (Tea, Snacks & Bakery)';
+    if (hasMeals) {
+      counter = 'Counter 1 (Meals & Breakfast)';
+    } else if (hasJuicesOrIceCream) {
+      counter = 'Counter 3 (Juices & Ice Cream)';
     }
 
     const now = new Date();
-    const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-    const dateString = now.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const newToken: GeneratedToken = {
-      id: `token-${Date.now()}`,
+      id: `token-${Date.now()}-${randomSuffix}`,
       tokenNumber,
       role,
       personName: personName.trim(),
-      personIdentifier: personIdentifier.trim(),
-      location: facility,
-      items: selectedItemsList,
-      totalAmount: totalEstimatedAmount,
+      personIdentifier: `${department} • ${personId || (role === 'student' ? 'Roll N/A' : 'Staff N/A')}`,
+      location: 'canteen',
+      items: tokenItemsList,
+      totalAmount,
       status: 'active',
       counter,
-      timestamp: `${dateString} • ${timeString}`,
+      timestamp: timeFormatted,
       createdAt: Date.now(),
+      qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+        `SB-COLLEGE-CANTEEN:${tokenNumber}:${totalAmount}:${personName.trim()}`
+      )}`,
     };
 
     setGeneratedToken(newToken);
     onTokenGenerated(newToken);
-    setStep(4);
+    playOrderChime();
+    setStep('success');
   };
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleCopyToken = () => {
-    if (generatedToken) {
-      navigator.clipboard.writeText(
-        `Campus Canteen Token: ${generatedToken.tokenNumber} (${generatedToken.role.toUpperCase()})\nName: ${generatedToken.personName} (${generatedToken.personIdentifier})\nItems: ${generatedToken.items.map((i) => `${i.nameMalayalam} (${i.name}) x${i.quantity}`).join(', ')}\nCounter: ${generatedToken.counter}\nCollected online without paying at: ${generatedToken.timestamp}\nDesigned by Ebin Mathew Sogy`
-      );
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    }
-  };
-
-  const resetModal = () => {
-    setStep(1);
-    setPersonName('');
-    setPersonIdentifier('');
-    setQuantities({});
+  const handleCloseAndReset = () => {
+    setStep('form');
+    setSelectedItems({});
     setGeneratedToken(null);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-6">
-        
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6">
+      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in-50 zoom-in-95 max-h-[92vh] flex flex-col">
         {/* Modal Top Header */}
-        <div className="bg-[#7b1122] text-white px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-400 text-amber-950 flex items-center justify-center font-bold">
-              <Ticket className="w-5 h-5" />
+        <div className="bg-[#7b1122] text-white p-5 flex items-center justify-between border-b border-[#600d1a] shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white text-[#7b1122] flex items-center justify-center font-serif font-black text-lg border border-amber-400">
+              SB
             </div>
             <div>
-              <h3 className="font-bold text-base sm:text-lg leading-tight">
-                Cashless Online Token Generator
+              <h3 className="text-lg font-black tracking-tight text-white">
+                {step === 'form' ? 'Generate Campus Canteen Food Token' : 'Digital Token Pass Issued'}
               </h3>
               <p className="text-xs text-amber-200">
-                Collect food token online without paying • Campus Dining
+                St. Berchmans College (SB College), Changanassery
               </p>
             </div>
           </div>
+
           <button
-            onClick={resetModal}
-            className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            title="Close"
+            type="button"
+            onClick={handleCloseAndReset}
+            className="p-2 rounded-xl text-amber-200 hover:text-white hover:bg-[#5c0a18] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Multi-step progress tracker */}
-        <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center justify-between text-xs font-semibold text-slate-600">
-          <div className={`flex items-center gap-1.5 ${step >= 1 ? 'text-[#7b1122]' : 'text-slate-400'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${step >= 1 ? 'bg-[#7b1122] text-white' : 'bg-slate-200 text-slate-600'}`}>1</span>
-            <span>1. Role (Student/Staff)</span>
-          </div>
-          <div className="w-6 h-0.5 bg-slate-200"></div>
-          <div className={`flex items-center gap-1.5 ${step >= 2 ? 'text-[#7b1122]' : 'text-slate-400'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${step >= 2 ? 'bg-[#7b1122] text-white' : 'bg-slate-200 text-slate-600'}`}>2</span>
-            <span>2. Facility</span>
-          </div>
-          <div className="w-6 h-0.5 bg-slate-200"></div>
-          <div className={`flex items-center gap-1.5 ${step >= 3 ? 'text-[#7b1122]' : 'text-slate-400'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${step >= 3 ? 'bg-[#7b1122] text-white' : 'bg-slate-200 text-slate-600'}`}>3</span>
-            <span>3. Food Selection</span>
-          </div>
-          <div className="w-6 h-0.5 bg-slate-200"></div>
-          <div className={`flex items-center gap-1.5 ${step === 4 ? 'text-[#7b1122]' : 'text-slate-400'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${step === 4 ? 'bg-[#7b1122] text-white' : 'bg-slate-200 text-slate-600'}`}>4</span>
-            <span>4. Pass</span>
-          </div>
-        </div>
+        {/* Content Body */}
+        <div className="overflow-y-auto p-5 sm:p-6 grow space-y-5">
+          {step === 'form' ? (
+            <form onSubmit={handleGenerate} className="space-y-5">
+              {/* Step 1: Role Switcher */}
+              <div className="space-y-2">
+                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                  Step 1: Select User Role
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRole('student')}
+                    className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      role === 'student'
+                        ? 'border-[#7b1122] bg-red-50/60 ring-2 ring-[#7b1122]'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shrink-0">
+                      <GraduationCap className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="font-extrabold text-sm text-slate-900">Student Token</div>
+                      <div className="text-[11px] text-slate-500">With Roll / Reg Number</div>
+                    </div>
+                  </button>
 
-        {/* Modal Body */}
-        <div className="p-5 sm:p-6 max-h-[75vh] overflow-y-auto">
-          
-          {/* STEP 1: Student or Staff Role Declaration */}
-          {step === 1 && (
-            <div className="space-y-5 text-left">
-              <div>
-                <h4 className="text-base font-bold text-slate-900">
-                  Step 1: Are you a Student or Staff member?
-                </h4>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  നിങ്ങൾ വിദ്യാർത്ഥിയാണോ ജീവനക്കാരനാണോ എന്ന് തിരഞ്ഞെടുക്കുക (Tokens are generated without paying).
-                </p>
+                  <button
+                    type="button"
+                    onClick={() => setRole('staff')}
+                    className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      role === 'staff'
+                        ? 'border-[#7b1122] bg-red-50/60 ring-2 ring-[#7b1122]'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-[#7b1122] text-white flex items-center justify-center font-bold shrink-0">
+                      <Briefcase className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="font-extrabold text-sm text-slate-900">Faculty / Staff Token</div>
+                      <div className="text-[11px] text-slate-500">Priority Counter Dining</div>
+                    </div>
+                  </button>
+                </div>
               </div>
 
-              {/* Role Select Buttons */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => handleRoleSelect('student')}
-                  className={`p-4 rounded-xl border-2 text-left flex items-start gap-3 transition-all ${
-                    role === 'student'
-                      ? 'border-sky-500 bg-sky-50/70 shadow-sm ring-2 ring-sky-200'
-                      : 'border-slate-200 hover:border-slate-300 bg-white'
-                  }`}
-                >
-                  <div className={`p-2.5 rounded-lg shrink-0 ${role === 'student' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    <GraduationCap className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-slate-900 text-sm">Student</span>
-                      <span className="text-xs font-semibold text-sky-700 bg-sky-100 px-2 py-0.2 rounded-full">
-                        വിദ്യാർത്ഥി
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      For all UG, PG &amp; Research Scholars.
-                    </p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleRoleSelect('staff')}
-                  className={`p-4 rounded-xl border-2 text-left flex items-start gap-3 transition-all ${
-                    role === 'staff'
-                      ? 'border-purple-500 bg-purple-50/70 shadow-sm ring-2 ring-purple-200'
-                      : 'border-slate-200 hover:border-slate-300 bg-white'
-                  }`}
-                >
-                  <div className={`p-2.5 rounded-lg shrink-0 ${role === 'staff' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    <Briefcase className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-slate-900 text-sm">Staff / Faculty</span>
-                      <span className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.2 rounded-full">
-                        ജീവനക്കാർ
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      For Teaching Faculty, Administrative &amp; Non-Teaching staff.
-                    </p>
-                  </div>
-                </button>
-              </div>
-
-              {/* Input details */}
-              <div className="space-y-4 pt-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {role === 'student' ? 'Student Full Name' : 'Staff / Faculty Member Name'} *
+              {/* Step 2: Personal Identification */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Your Name *
                   </label>
                   <input
                     type="text"
                     required
                     value={personName}
                     onChange={(e) => setPersonName(e.target.value)}
-                    placeholder={role === 'student' ? 'e.g. Rahul K. / Ananya Joseph' : 'e.g. Dr. Thomas Mathew / Prof. Priya'}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#7b1122] focus:border-[#7b1122]"
+                    placeholder="e.g. Ebin Mathew"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#7b1122]"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {role === 'student'
-                      ? 'Department & Roll Number / Class *'
-                      : 'Department / Staff ID Number *'}
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {role === 'student' ? 'Roll No / Reg ID' : 'Staff ID'}
                   </label>
                   <input
                     type="text"
-                    required
-                    value={personIdentifier}
-                    onChange={(e) => setPersonIdentifier(e.target.value)}
-                    placeholder={
-                      role === 'student'
-                        ? 'e.g. 3rd Year B.Sc Computer Science (Roll 24)'
-                        : 'e.g. Dept of Physics / Staff ID #SB-412'
-                    }
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#7b1122] focus:border-[#7b1122]"
+                    value={personId}
+                    onChange={(e) => setPersonId(e.target.value)}
+                    placeholder={role === 'student' ? 'e.g. 210021' : 'e.g. FAC-402'}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#7b1122]"
                   />
                 </div>
-              </div>
 
-              {/* No Payment Notice */}
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                <div>
-                  <strong>No Payment Required Online:</strong> Tokens are collected 100% cashless on this web portal. Your digital token will be issued instantly for campus food collection.
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Department
+                  </label>
+                  <select
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#7b1122]"
+                  >
+                    {DEPARTMENTS.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  disabled={!personName.trim() || !personIdentifier.trim()}
-                  onClick={() => setStep(2)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#7b1122] text-white font-semibold text-sm hover:bg-[#600d1a] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
-                  <span>Continue to Step 2</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: Choose Dining Facility */}
-          {step === 2 && (
-            <div className="space-y-5 text-left">
-              <div>
-                <h4 className="text-base font-bold text-slate-900">
-                  Step 2: Choose Dining Location
-                </h4>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Select whether you want to collect your items from the Main Canteen or the Express Cafeteria.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Main Canteen Option */}
-                <div
-                  onClick={() => setFacility('canteen')}
-                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    facility === 'canteen'
-                      ? 'border-[#7b1122] bg-[#fbf2f4] ring-2 ring-rose-200'
-                      : 'border-slate-200 hover:border-slate-300 bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-[#7b1122] text-white">
-                        <UtensilsCrossed className="w-5 h-5" />
-                      </div>
-                      <span className="font-bold text-slate-900 text-sm">
-                        Main Canteen (മെയിൻ കാന്റീൻ)
-                      </span>
-                    </div>
-                    {facility === 'canteen' && <Check className="w-5 h-5 text-[#7b1122]" />}
+              {/* Step 3: Food Items Selection */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                    Step 2: Select Items ({tokenItemsList.length} added)
+                  </label>
+                  <div className="relative w-44">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search items..."
+                      className="w-full pl-7 pr-2 py-1 rounded-lg border border-slate-200 text-[11px]"
+                    />
                   </div>
-                  <p className="text-xs text-slate-600 space-y-1">
-                    <span>• Morning Breakfast (8 AM - 11:30 AM)</span><br />
-                    <span>• Lunch Mess (12 PM - 2:30 PM)</span><br />
-                    <span className="text-amber-800 font-semibold">• Juices, Snacks, Tea &amp; Coffee all day (8 AM - 5 PM)</span>
-                  </p>
                 </div>
 
-                {/* Cafeteria Option */}
-                <div
-                  onClick={() => setFacility('cafeteria')}
-                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    facility === 'cafeteria'
-                      ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-200'
-                      : 'border-slate-200 hover:border-slate-300 bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-amber-600 text-white">
-                        <Coffee className="w-5 h-5" />
-                      </div>
-                      <span className="font-bold text-slate-900 text-sm">
-                        Express Cafeteria (കഫറ്റീരിയ)
-                      </span>
-                    </div>
-                    {facility === 'cafeteria' && <Check className="w-5 h-5 text-amber-600" />}
-                  </div>
-                  <p className="text-xs text-slate-600 space-y-1">
-                    <span className="font-semibold text-emerald-700">Full Time 8:00 AM – 5:00 PM</span><br />
-                    <span>• Exclusively Bakery Items (Chicken/Egg Puffs, Meat Rolls)</span><br />
-                    <span>• Express Hot Kerala Tea &amp; Filter Coffee</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-between pt-3">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep(3)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#7b1122] text-white font-semibold text-sm hover:bg-[#600d1a] transition-all"
-                >
-                  <span>Select Food Items</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Food Items Selection with Malayalam screening */}
-          {step === 3 && (
-            <div className="space-y-4 text-left">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
-                <div>
-                  <h4 className="text-base font-bold text-slate-900">
-                    Step 3: Select Food &amp; Beverage Items
-                  </h4>
-                  <p className="text-xs text-slate-500">
-                    Malayalam screening for food items • Choose quantity
-                  </p>
-                </div>
-                <div className="text-xs bg-slate-100 text-slate-700 font-semibold px-2.5 py-1 rounded-md">
-                  {facility === 'canteen' ? 'Main Canteen Menu' : 'Cafeteria Express Menu'}
-                </div>
-              </div>
-
-              {/* Items List */}
-              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                {availableItems.map((item) => {
-                  const qty = quantities[item.id] || 0;
-                  return (
-                    <div
-                      key={item.id}
-                      className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${
-                        qty > 0 ? 'bg-amber-50/50 border-amber-300 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300'
+                {/* Category tabs */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[11px]">
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'breakfast', label: 'Breakfast (08-10 AM)' },
+                    { id: 'meals', label: 'Lunch Meals (12-01:30 PM)' },
+                    { id: 'snacks', label: 'Snacks' },
+                    { id: 'teacoffee', label: 'Tea & Coffee' },
+                    { id: 'icecream', label: 'Ice Cream' },
+                    { id: 'juices', label: 'Juices' },
+                    { id: 'bakery', label: 'Bakery' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setSelectedCategory(tab.id)}
+                      className={`px-3 py-1 rounded-lg font-bold shrink-0 transition-colors ${
+                        selectedCategory === tab.id
+                          ? 'bg-[#7b1122] text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                              item.diet === 'veg'
-                                ? 'bg-emerald-500'
-                                : item.diet === 'egg'
-                                ? 'bg-amber-500'
-                                : 'bg-red-500'
-                            }`}
-                            title={item.diet.toUpperCase()}
-                          />
-                          <span className="font-bold text-sm text-slate-900">
-                            {item.name}
-                          </span>
-                          {/* Malayalam Screening */}
-                          <span className="text-xs font-semibold text-[#7b1122] bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                            {item.nameMalayalam}
-                          </span>
-                        </div>
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-                        <div className="text-xs text-slate-500 flex items-center gap-3">
-                          <span className="font-semibold text-slate-800">₹{item.price}</span>
-                          <span>• {item.timing}</span>
-                        </div>
-                      </div>
-
-                      {/* Quantity Selector */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        {qty > 0 ? (
-                          <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1 border border-slate-300">
-                            <button
-                              type="button"
-                              onClick={() => handleQuantityChange(item.id, -1)}
-                              className="w-7 h-7 rounded bg-white text-slate-700 flex items-center justify-center hover:bg-slate-200 shadow-xs"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="w-6 text-center font-bold text-sm text-slate-900">
-                              {qty}
+                {/* Items list */}
+                <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-2xl divide-y divide-slate-100 p-1 bg-slate-50/50">
+                  {filteredMenuItems.map((item) => {
+                    const count = selectedItems[item.id] || 0;
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-2.5 flex items-center justify-between gap-2 hover:bg-white rounded-xl transition-colors"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-slate-900 truncate">
+                              {item.name}
                             </span>
+                            {item.isFullTime && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-100 text-emerald-800 shrink-0">
+                                Full Time
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-amber-900/80 font-serif">
+                            {item.nameMalayalam}
+                          </div>
+                          <div className="text-xs font-black text-[#7b1122]">₹{item.price}</div>
+                        </div>
+
+                        {/* Quantity Counter */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {count > 0 ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleItemQuantityChange(item.id, -1)}
+                                className="w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 flex items-center justify-center font-bold text-sm"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="w-6 text-center font-black text-xs text-slate-900">
+                                {count}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleItemQuantityChange(item.id, 1)}
+                                className="w-7 h-7 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center justify-center font-bold text-sm"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
                             <button
                               type="button"
-                              onClick={() => handleQuantityChange(item.id, 1)}
-                              className="w-7 h-7 rounded bg-[#7b1122] text-white flex items-center justify-center hover:bg-[#600d1a] shadow-xs"
+                              onClick={() => handleItemQuantityChange(item.id, 1)}
+                              className="px-3 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold"
                             >
-                              <Plus className="w-3.5 h-3.5" />
+                              Add
                             </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleQuantityChange(item.id, 1)}
-                            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#7b1122] hover:text-white text-slate-700 text-xs font-semibold border border-slate-300 transition-colors"
-                          >
-                            + Add
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Selected Summary Bar */}
-              <div className="p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-slate-400">Total Items: </span>
-                  <strong className="text-white text-sm">{totalItemCount} items</strong>
-                  <span className="text-slate-400 ml-2">Estimated Value: </span>
-                  <strong className="text-amber-300 text-sm">₹{totalEstimatedAmount}</strong>
-                </div>
-                <span className="text-emerald-400 font-semibold bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/30">
-                  0 Online Payment Required
-                </span>
-              </div>
-
-              <div className="flex justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
-                >
-                  Back
-                </button>
-
-                <button
-                  type="button"
-                  disabled={totalItemCount === 0}
-                  onClick={handleGenerateToken}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all"
-                >
-                  <Ticket className="w-4 h-4" />
-                  <span>Generate Token Online (No Cash)</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: Token Card Generated! */}
-          {step === 4 && generatedToken && (
-            <div className="space-y-5 text-left animate-in fade-in zoom-in-95 duration-200">
-              <div className="text-center space-y-1">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mb-1">
-                  <CheckCircle2 className="w-7 h-7" />
-                </div>
-                <h4 className="text-lg font-extrabold text-slate-900">
-                  Cashless Token Generated Successfully!
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Present this digital token on your mobile screen at the campus counter to collect your food.
-                </p>
-              </div>
-
-              {/* Printable Digital Token Pass */}
-              <div
-                id="printable-token-pass"
-                className="bg-gradient-to-br from-amber-50/80 via-white to-orange-50/50 border-2 border-amber-400 rounded-2xl p-5 shadow-lg relative overflow-hidden space-y-4"
-              >
-                {/* Watermark */}
-                <div className="absolute right-2 -bottom-6 text-9xl font-serif font-black text-amber-500/5 select-none pointer-events-none">
-                  TOKEN
-                </div>
-
-                {/* Header of Pass */}
-                <div className="flex items-center justify-between border-b border-amber-200 pb-3">
-                  <div>
-                    <div className="text-[10px] font-bold tracking-wider text-amber-900 uppercase">
-                      Campus Canteen &amp; Cafeteria
-                    </div>
-                    <div className="text-xs text-slate-500">Main Dining Hall &amp; Express Counter</div>
-                  </div>
-
-                  <span
-                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
-                      generatedToken.role === 'student'
-                        ? 'bg-sky-100 text-sky-800 border border-sky-300'
-                        : 'bg-purple-100 text-purple-800 border border-purple-300'
-                    }`}
-                  >
-                    {generatedToken.role === 'student' ? (
-                      <>
-                        <GraduationCap className="w-3.5 h-3.5" />
-                        <span>STUDENT (വിദ്യാർത്ഥി)</span>
-                      </>
-                    ) : (
-                      <>
-                        <Briefcase className="w-3.5 h-3.5" />
-                        <span>STAFF (ജീവനക്കാർ)</span>
-                      </>
-                    )}
-                  </span>
-                </div>
-
-                {/* Big Token Number & Verification */}
-                <div className="bg-slate-900 text-white p-4 rounded-xl flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] text-amber-300 font-semibold tracking-wider uppercase">
-                      Official Token Number
-                    </div>
-                    <div className="text-2xl sm:text-3xl font-mono font-extrabold tracking-wider text-amber-400">
-                      {generatedToken.tokenNumber}
-                    </div>
-                    <div className="text-[11px] text-slate-300 mt-0.5">
-                      {generatedToken.timestamp}
-                    </div>
-                  </div>
-
-                  {/* QR Graphic Mock */}
-                  <div className="p-2 bg-white rounded-lg text-slate-900 flex flex-col items-center">
-                    <QrCode className="w-10 h-10" />
-                    <span className="text-[8px] font-mono font-bold">VERIFIED</span>
-                  </div>
-                </div>
-
-                {/* Person details & Counter */}
-                <div className="grid grid-cols-2 gap-3 text-xs bg-white/80 p-3 rounded-lg border border-amber-100">
-                  <div>
-                    <span className="text-slate-500 block">Name:</span>
-                    <strong className="text-slate-900 font-semibold text-sm">{generatedToken.personName}</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block">
-                      {generatedToken.role === 'student' ? 'Class / Roll No:' : 'Department / Staff ID:'}
-                    </span>
-                    <strong className="text-slate-900 font-semibold">{generatedToken.personIdentifier}</strong>
-                  </div>
-                  <div className="col-span-2 pt-1 border-t border-slate-100">
-                    <span className="text-slate-500 block">Collection Counter:</span>
-                    <strong className="text-[#7b1122] font-bold">{generatedToken.counter}</strong>
-                  </div>
-                </div>
-
-                {/* Items breakdown with Malayalam Screening */}
-                <div className="space-y-1.5">
-                  <div className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Ordered Food Items (ഭക്ഷണ സാധനങ്ങൾ)
-                  </div>
-                  <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100 text-xs">
-                    {generatedToken.items.map((item, idx) => (
-                      <div key={idx} className="p-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">{item.name}</span>
-                          <span className="text-[11px] font-semibold text-[#7b1122] bg-rose-50 px-1.5 py-0.2 rounded">
-                            {item.nameMalayalam}
-                          </span>
+                          )}
                         </div>
-                        <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
-                          Qty: {item.quantity}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Order Total & Submit */}
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs text-slate-500 font-medium block">Total Payable:</span>
+                  <span className="text-2xl font-black text-[#7b1122]">₹{totalAmount}</span>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!personName.trim() || tokenItemsList.length === 0}
+                  className="px-6 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black text-sm shadow-md transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <Ticket className="w-4 h-4 text-slate-950" />
+                  <span>Issue Canteen Token (₹{totalAmount})</span>
+                </button>
+              </div>
+            </form>
+          ) : (
+            /* Step: Success / Printable Pass Display */
+            generatedToken && (
+              <div className="space-y-6">
+                {/* Visual Pass Ticket Card */}
+                <div
+                  id="printable-token-pass"
+                  className="rounded-3xl border-2 border-amber-400 bg-gradient-to-b from-amber-50 to-white p-6 shadow-lg space-y-4 max-w-md mx-auto"
+                >
+                  <div className="flex items-center justify-between border-b border-amber-200 pb-3">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#7b1122] block">
+                        St. Berchmans College Changanassery
+                      </span>
+                      <h4 className="font-extrabold text-slate-900 text-base">
+                        Digital Food Token Pass
+                      </h4>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-[#7b1122] text-amber-300 text-xs font-black uppercase">
+                      {generatedToken.role}
+                    </span>
+                  </div>
+
+                  {/* Token Number */}
+                  <div className="text-center py-2.5 bg-white rounded-2xl border border-amber-200/80 shadow-xs">
+                    <span className="text-[11px] font-bold text-slate-400 block uppercase">
+                      Token Number
+                    </span>
+                    <span className="text-3xl sm:text-4xl font-mono font-black text-[#7b1122] tracking-wider">
+                      {generatedToken.tokenNumber}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-700 block mt-1">
+                      {generatedToken.counter}
+                    </span>
+                  </div>
+
+                  {/* QR Code */}
+                  {generatedToken.qrCodeUrl && (
+                    <div className="flex flex-col items-center justify-center p-2">
+                      <img
+                        src={generatedToken.qrCodeUrl}
+                        alt="Token QR"
+                        className="w-32 h-32 rounded-xl border border-slate-200"
+                        referrerPolicy="no-referrer"
+                      />
+                      <span className="text-[10px] text-slate-400 font-mono mt-1">
+                        Scan at Canteen Pickup Desk
+                      </span>
+                    </div>
+                  )}
+
+                  {/* User & Order Meta */}
+                  <div className="bg-slate-50 p-3 rounded-2xl text-xs space-y-1 border border-slate-100">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Name:</span>
+                      <span className="font-bold text-slate-900">{generatedToken.personName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">ID / Dept:</span>
+                      <span className="font-semibold text-slate-700">
+                        {generatedToken.personIdentifier}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Time:</span>
+                      <span className="font-mono text-slate-700">{generatedToken.timestamp}</span>
+                    </div>
+                  </div>
+
+                  {/* Selected Items list */}
+                  <div className="space-y-1.5 text-xs">
+                    <div className="font-bold text-slate-700 pb-1 border-b border-slate-100">
+                      Items Ordered:
+                    </div>
+                    {generatedToken.items.map((it) => (
+                      <div key={it.menuItemId} className="flex justify-between text-slate-800">
+                        <span>
+                          {it.quantity}x {it.name}
                         </span>
+                        <span className="font-bold">₹{it.price * it.quantity}</span>
                       </div>
                     ))}
+                    <div className="flex justify-between pt-2 border-t border-slate-200 font-black text-sm text-slate-900">
+                      <span>Total Amount:</span>
+                      <span className="text-[#7b1122]">₹{generatedToken.totalAmount}</span>
+                    </div>
+                  </div>
+
+                  {/* Credit footer */}
+                  <div className="text-center pt-2 text-[10px] text-slate-400 border-t border-slate-100">
+                    St. Berchmans College Canteen • Designed by Ebin Mathew Sogy
                   </div>
                 </div>
 
-                {/* Cashless Seal & Designer Credit */}
-                <div className="pt-2 border-t border-amber-200/80 flex flex-wrap items-center justify-between text-[11px] text-slate-600 gap-2">
-                  <div className="flex items-center gap-1.5 text-emerald-700 font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Cashless Online Token • 0 Cash Paid Online</span>
-                  </div>
-
-                  <div className="text-slate-500">
-                    Designed by <strong className="text-slate-800 font-semibold">Ebin Mathew Sogy</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleCopyToken}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 inline-flex items-center gap-1.5"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-4 h-4 text-emerald-600" />
-                      <span>Copied Token!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      <span>Copy Details</span>
-                    </>
-                  )}
-                </button>
-
-                <div className="flex items-center gap-2">
+                {/* Actions */}
+                <div className="flex flex-wrap items-center justify-center gap-3">
                   <button
                     type="button"
                     onClick={handlePrint}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-white font-semibold text-xs hover:bg-slate-700 inline-flex items-center gap-1.5"
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-2"
                   >
                     <Printer className="w-4 h-4" />
-                    <span>Print Token</span>
+                    <span>Print Token Pass</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={resetModal}
-                    className="px-5 py-2 rounded-xl bg-[#7b1122] text-white font-semibold text-xs hover:bg-[#600d1a]"
+                    onClick={handleCloseAndReset}
+                    className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs"
                   >
                     Done &amp; Close
                   </button>
                 </div>
               </div>
-            </div>
+            )
           )}
-
         </div>
-
       </div>
     </div>
   );

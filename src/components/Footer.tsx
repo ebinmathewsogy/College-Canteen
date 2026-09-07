@@ -1,134 +1,82 @@
 import React from 'react';
-import { ShieldCheck, Heart, MapPin, Phone, Mail, Clock, Ticket, UtensilsCrossed } from 'lucide-react';
+import { MapPin, Phone, Mail, Globe, Heart } from 'lucide-react';
 
-interface FooterProps {
-  onOpenTokenModal: (role?: 'student' | 'staff') => void;
-}
-
-export const Footer: React.FC<FooterProps> = ({ onOpenTokenModal }) => {
+export const Footer: React.FC = () => {
   return (
-    <footer className="bg-slate-950 text-white border-t border-slate-800 pt-12 pb-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 text-left">
-        
-        {/* Main Footer Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          
-          {/* Brand & Designer Attribution */}
-          <div className="space-y-4">
+    <footer className="bg-[#450711] text-amber-100/90 border-t border-[#36050d] text-xs">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* Col 1 */}
+          <div className="space-y-3 md:col-span-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#7b1122] text-amber-300 font-bold text-lg flex items-center justify-center border border-amber-400/30">
-                <UtensilsCrossed className="w-5 h-5 text-amber-300" />
+              <div className="w-10 h-10 rounded-xl bg-white text-[#7b1122] flex items-center justify-center font-serif font-black text-lg border border-amber-400">
+                SB
               </div>
               <div>
-                <h4 className="font-bold text-white text-base">
-                  Campus Canteen
+                <h4 className="font-black text-white text-base tracking-tight">
+                  St. Berchmans College (Autonomous)
                 </h4>
-                <p className="text-xs text-slate-400">
-                  Canteen &amp; Express Cafeteria
+                <p className="text-[11px] text-amber-200">
+                  Affiliated to Mahatma Gandhi University, Kottayam
                 </p>
               </div>
             </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Official dining &amp; cashless token portal for campus students, faculty, and administrative staff.
+            <p className="text-xs text-amber-200/80 max-w-md leading-relaxed">
+              SB College Canteen Management System Changanassery enables students, faculty, and campus staff to access fresh campus food through streamlined digital token passes.
             </p>
-
-            {/* Prominent Designer Highlight */}
-            <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-400/30 text-xs">
-              <div className="flex items-center gap-1.5 text-amber-300 font-bold mb-1">
-                <ShieldCheck className="w-4 h-4 text-amber-400" />
-                <span>Developer &amp; Designer</span>
-              </div>
-              <p className="text-slate-300">
-                Designed &amp; Developed by <strong className="text-white font-bold underline decoration-amber-400 underline-offset-2">Ebin Mathew Sogy</strong>.
-              </p>
+            <div className="text-xs font-bold text-amber-300">
+              NAAC Re-accredited with A++ Grade (CGPA 3.66)
             </div>
           </div>
 
-          {/* Dining Services */}
-          <div className="space-y-3">
-            <h5 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
-              Dining Facilities
+          {/* Col 2 */}
+          <div className="space-y-2">
+            <h5 className="font-extrabold text-white text-xs uppercase tracking-wider">
+              Canteen Counters &amp; Facilities
             </h5>
-            <ul className="space-y-2 text-xs text-slate-400">
-              <li>
-                <strong className="text-slate-200 block">Main Canteen:</strong>
-                Breakfast (8:00–11:30 AM), Lunch (12:00–2:30 PM), All-day Snacks &amp; Juices (8 AM–5 PM).
-              </li>
-              <li>
-                <strong className="text-slate-200 block">Express Cafeteria:</strong>
-                Bakery snacks, Hot Kerala tea &amp; Filter coffee full time (8:00 AM – 5:00 PM).
-              </li>
-              <li>
-                <strong className="text-slate-200 block">Malayalam Screening:</strong>
-                All food and beverage items feature bilingual Malayalam &amp; English names.
-              </li>
+            <ul className="space-y-1.5 text-xs text-amber-200/80">
+              <li>Central Canteen (Main Hall)</li>
+              <li>Full-Time Tea, Snacks &amp; Bakery Desk</li>
+              <li>Fresh Juices &amp; Ice Cream Corner</li>
+              <li>Faculty Priority Dining Room</li>
+              <li>Meals &amp; Biryani Token Counter</li>
             </ul>
           </div>
 
-          {/* Quick Token Portal */}
-          <div className="space-y-3">
-            <h5 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
-              Online Token Portal
+          {/* Col 3 */}
+          <div className="space-y-2">
+            <h5 className="font-extrabold text-white text-xs uppercase tracking-wider">
+              Campus Contact
             </h5>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Generate free cashless tokens directly online without paying upfront cash at counters.
-            </p>
-            <div className="space-y-2 pt-1">
-              <button
-                onClick={() => onOpenTokenModal('student')}
-                className="w-full text-left px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs text-sky-300 font-medium flex items-center justify-between border border-slate-800"
-              >
-                <span>Student Token (വിദ്യാർത്ഥി)</span>
-                <Ticket className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => onOpenTokenModal('staff')}
-                className="w-full text-left px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs text-purple-300 font-medium flex items-center justify-between border border-slate-800"
-              >
-                <span>Staff Token (ജീവനക്കാർ)</span>
-                <Ticket className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Campus Location & Info */}
-          <div className="space-y-3">
-            <h5 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
-              Dining Location
-            </h5>
-            <ul className="space-y-2.5 text-xs text-slate-400">
-              <li className="flex items-start gap-2">
+            <div className="space-y-1.5 text-xs text-amber-200/80">
+              <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <span>
-                  Campus Dining Block, Main Canteen &amp; Express Cafeteria Kiosk
-                </span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Monday – Friday • 8:00 AM – 5:00 PM</span>
-              </li>
-              <li className="flex items-center gap-2">
+                <span>Changanassery, Kottayam District, Kerala - 686101</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>0481 2420025 / 2420125</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>canteen-dining@campus.edu</span>
-              </li>
-            </ul>
+                <span>sbc@sbcollege.ac.in</span>
+              </div>
+            </div>
           </div>
-
         </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-8 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        {/* Bottom copyright */}
+        <div className="pt-6 border-t border-amber-900/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-amber-200/70">
           <div>
-            © {new Date().getFullYear()} Campus Canteen &amp; Cafeteria. All Rights Reserved.
+            © {new Date().getFullYear()} St. Berchmans College, Changanassery. All rights reserved.
           </div>
-
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <span>Website designed and built by</span>
-            <span className="text-amber-300 font-bold">Ebin Mathew Sogy</span>
+          <div className="flex items-center gap-1">
+            <span>Designed &amp; Developed with</span>
+            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+            <span>by</span>
+            <strong className="font-bold text-white ml-0.5">Ebin Mathew Sogy</strong>
           </div>
         </div>
-
       </div>
     </footer>
   );

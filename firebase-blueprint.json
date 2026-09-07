@@ -1,0 +1,51 @@
+{
+  "entities": {
+    "UserProfile": {
+      "collection": "users",
+      "fields": {
+        "id": { "type": "string", "description": "User ID" },
+        "email": { "type": "string", "description": "User email" },
+        "displayName": { "type": "string", "description": "Display name" },
+        "photoURL": { "type": "string", "description": "Avatar URL" },
+        "createdAt": { "type": "string", "description": "Account creation timestamp" }
+      }
+    },
+    "Workspace": {
+      "collection": "workspaces",
+      "fields": {
+        "id": { "type": "string", "description": "Unique workspace ID" },
+        "name": { "type": "string", "description": "Workspace or Project name" },
+        "description": { "type": "string", "description": "Workspace purpose" },
+        "color": { "type": "string", "description": "Color theme accent" },
+        "ownerId": { "type": "string", "description": "UID of creator" },
+        "ownerName": { "type": "string", "description": "Name of creator" },
+        "memberIds": { "type": "array", "description": "List of user UIDs who are members" },
+        "members": { "type": "array", "description": "List of member profile objects" },
+        "inviteCode": { "type": "string", "description": "Shareable invite code for collaborators" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last updated timestamp" }
+      }
+    },
+    "Task": {
+      "collection": "workspaces/{workspaceId}/tasks",
+      "fields": {
+        "id": { "type": "string", "description": "Unique task ID" },
+        "workspaceId": { "type": "string", "description": "Workspace ID" },
+        "title": { "type": "string", "description": "Task title" },
+        "description": { "type": "string", "description": "Task description and notes" },
+        "status": { "type": "string", "description": "Task status: todo, in_progress, review, done" },
+        "priority": { "type": "string", "description": "Task priority: low, medium, high, urgent" },
+        "dueDate": { "type": "string", "description": "ISO date string or null" },
+        "assigneeId": { "type": "string", "description": "UID of assigned team member" },
+        "assigneeName": { "type": "string", "description": "Name of assigned member" },
+        "assigneeEmail": { "type": "string", "description": "Email of assigned member" },
+        "tags": { "type": "array", "description": "List of tag labels" },
+        "subtasks": { "type": "array", "description": "Checklist subtasks with completed flag" },
+        "createdBy": { "type": "string", "description": "UID of creator" },
+        "createdByName": { "type": "string", "description": "Name of creator" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Update timestamp" }
+      }
+    }
+  }
+}
