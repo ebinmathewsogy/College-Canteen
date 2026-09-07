@@ -1,6 +1,6 @@
 {
   "name": "SB College Canteen Management Changanassery",
-  "description": "Official online canteen management and cashless token system for St. Berchmans College (SB College), Changanassery. Features digital token passes, bilingual Malayalam & English menus, and counter dining. Designed by Ebin Mathew Sogy.",
+  "description": "Official online canteen management and cashless token system for St. Berchmans College (SB College), Changanassery. Features digital token passes, subsidized student meals, and counter dining. Designed by Ebin Mathew Sogy.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -80,8 +80,7 @@ export const TokenGeneratorModal: React.FC<TokenGeneratorModalProps> = ({
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = item.name.toLowerCase().includes(q);
-      const matchMal = item.nameMalayalam.includes(searchQuery);
-      if (!matchName && !matchMal) return false;
+      if (!matchName) return false;
     }
     return true;
   });
@@ -105,7 +104,6 @@ export const TokenGeneratorModal: React.FC<TokenGeneratorModalProps> = ({
     return {
       menuItemId: id,
       name: item.name,
-      nameMalayalam: item.nameMalayalam,
       quantity: Number(qty),
       price: item.price,
     };
@@ -324,22 +322,22 @@ export const TokenGeneratorModal: React.FC<TokenGeneratorModalProps> = ({
                 {/* Category tabs */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[11px]">
                   {[
-                    { id: 'all', label: 'All' },
-                    { id: 'breakfast', label: 'Breakfast (08-10 AM)' },
-                    { id: 'meals', label: 'Lunch Meals (12-01:30 PM)' },
-                    { id: 'snacks', label: 'Snacks' },
-                    { id: 'teacoffee', label: 'Tea & Coffee' },
-                    { id: 'icecream', label: 'Ice Cream' },
-                    { id: 'juices', label: 'Juices' },
-                    { id: 'bakery', label: 'Bakery' },
+                    { id: 'all', label: 'All', activeColor: 'bg-gradient-to-r from-[#7b1122] to-rose-700 text-white' },
+                    { id: 'breakfast', label: 'Breakfast (08-10 AM)', activeColor: 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black' },
+                    { id: 'meals', label: 'Lunch Meals (12-01:30 PM)', activeColor: 'bg-gradient-to-r from-red-600 to-rose-600 text-white' },
+                    { id: 'snacks', label: 'Snacks', activeColor: 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black' },
+                    { id: 'teacoffee', label: 'Tea & Coffee', activeColor: 'bg-gradient-to-r from-amber-800 to-yellow-800 text-white' },
+                    { id: 'icecream', label: 'Ice Cream', activeColor: 'bg-gradient-to-r from-pink-500 to-rose-500 text-white' },
+                    { id: 'juices', label: 'Juices', activeColor: 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white' },
+                    { id: 'bakery', label: 'Bakery', activeColor: 'bg-gradient-to-r from-amber-600 to-orange-600 text-white' },
                   ].map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
                       onClick={() => setSelectedCategory(tab.id)}
-                      className={`px-3 py-1 rounded-lg font-bold shrink-0 transition-colors ${
+                      className={`px-3 py-1.5 rounded-xl font-bold shrink-0 transition-all shadow-xs cursor-pointer ${
                         selectedCategory === tab.id
-                          ? 'bg-[#7b1122] text-white'
+                          ? `${tab.activeColor} shadow-sm ring-1 ring-black/10 scale-102`
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
@@ -367,9 +365,6 @@ export const TokenGeneratorModal: React.FC<TokenGeneratorModalProps> = ({
                                 Full Time
                               </span>
                             )}
-                          </div>
-                          <div className="text-[11px] text-amber-900/80 font-serif">
-                            {item.nameMalayalam}
                           </div>
                           <div className="text-xs font-black text-[#7b1122]">₹{item.price}</div>
                         </div>

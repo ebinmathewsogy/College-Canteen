@@ -14,12 +14,12 @@ export type MenuCategory =
 export interface MenuItem {
   id: string;
   name: string;
-  nameMalayalam: string;
+  nameMalayalam?: string;
   category: MenuCategory;
   price: number;
   diet: 'veg' | 'nonveg' | 'egg';
   description: string;
-  descriptionMalayalam: string;
+  descriptionMalayalam?: string;
   tags: string[];
   timing: string;
   isFullTime: boolean; // Available full-time throughout canteen working hours
@@ -30,7 +30,7 @@ export interface MenuItem {
 export interface TokenItem {
   menuItemId: string;
   name: string;
-  nameMalayalam: string;
+  nameMalayalam?: string;
   quantity: number;
   price: number;
 }

@@ -14,12 +14,15 @@ import {
   deleteTokenFromFirestore, 
   subscribeToCanteenTokens 
 } from './services/canteenService';
+import { Ticket, ChevronUp, Database } from 'lucide-react';
 
 export default function App() {
   const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
   const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | undefined>(undefined);
   const [preselectedItem, setPreselectedItem] = useState<MenuItem | undefined>(undefined);
+  const [activeMenuCategory, setActiveMenuCategory] = useState<string>('all');
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   // Local storage persisted tokens
   const [tokens, setTokens] = useState<GeneratedToken[]>(() => {
@@ -31,6 +34,15 @@ export default function App() {
       return [];
     }
   });
+
+  // Track scroll for back-to-top button
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 400);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Sync tokens to localStorage on change
   useEffect(() => {
@@ -45,7 +57,6 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToCanteenTokens((cloudTokens) => {
       setTokens((prevLocal) => {
-        // Merge cloud tokens with local ones without duplicates
         const map = new Map<string, GeneratedToken>();
         prevLocal.forEach((t) => map.set(t.id, t));
         cloudTokens.forEach((t) => map.set(t.id, t));
@@ -73,8 +84,8 @@ export default function App() {
   };
 
   const handleTokenGenerated = async (newToken: GeneratedToken) => {
-    setTokens((prev) => [newToken, ...prev]);
-    // Save to Firestore cloud database
+    setTokens((prev) => [newToken, ...prev.filter((t) => t.id !== newToken.id)]);
+    // Save to Firestore
     await saveTokenToFirestore(newToken);
   };
 
@@ -161,27 +172,31 @@ export default function App() {
         </head>
         <body>
           <div class="ticket">
-            <div class="college">St. Berchmans College Changanassery</div>
-            <div style="font-size: 15px; font-weight: bold; margin-top: 2px;">Campus Canteen Cashless Token Pass</div>
+            <div class="college">St. Berchmans College, Changanassery</div>
+            <div style="font-size:13px; margin-top:2px;">Central Campus Canteen Dining Pass</div>
             <div class="token-no">${token.tokenNumber}</div>
-            <div class="counter">${token.counter} (${token.role.toUpperCase()})</div>
+            <div class="counter">${token.counter}</div>
             
             <div class="divider"></div>
             
-            <div style="text-align:left; font-size:12px; margin-bottom:12px; line-height:1.6;">
+            <div style="text-align:left; font-size:12px; margin-bottom:12px;">
               <div><strong>Name:</strong> ${token.personName}</div>
-              <div><strong>ID/Dept:</strong> ${token.personIdentifier}</div>
-              <div><strong>Time:</strong> ${token.timestamp}</div>
+              <div><strong>ID / Roll:</strong> ${token.personIdentifier}</div>
+              <div><strong>Role:</strong> ${token.role.toUpperCase()}</div>
+              <div><strong>Issued:</strong> ${token.timestamp}</div>
+            </div>
+
+            <div class="divider"></div>
+            
+            <div style="text-align:left;">
+              ${itemsHtml}
             </div>
 
             <div class="divider"></div>
 
-            <div style="text-align:left;">
-              ${itemsHtml}
-              <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid #111; font-weight:900; font-size:15px;">
-                <span>Total Amount:</span>
-                <span>₹${token.totalAmount}</span>
-              </div>
+            <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold; color:#7b1122;">
+              <span>TOTAL PAID</span>
+              <span>₹${token.totalAmount}</span>
             </div>
 
             ${
@@ -189,10 +204,7 @@ export default function App() {
                 ? `<img class="qr" src="${token.qrCodeUrl}" alt="QR" />`
                 : ''
             }
-
-            <div style="font-size:10px; color:#666; margin-top:12px;">
-              Designed by Ebin Mathew Sogy • SB College
-            </div>
+            <div style="font-size:10px; color:#666;">Present this digital slip at food distribution desk</div>
           </div>
           <script>
             window.onload = function() {
@@ -205,8 +217,12 @@ export default function App() {
     printWindow.document.close();
   };
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-[#7b1122] selection:text-white">
       {/* College Header */}
       <Header
         activeTokenCount={tokens.length}
@@ -214,13 +230,15 @@ export default function App() {
         onOpenStorageModal={() => setIsStorageModalOpen(true)}
       />
 
-      {/* Hero Section */}
+      {/* Hero Section with Live Dining Session Clock */}
       <Hero
         onOpenTokenModal={handleOpenTokenModal}
       />
 
-      {/* College Campus Photo & Full-Time Highlights Showcase */}
-      <CollegeCampusShowcase />
+      {/* Meal Timings & Rates Schedule Showcase */}
+      <CollegeCampusShowcase 
+        onSelectCategory={(cat) => setActiveMenuCategory(cat)}
+      />
 
       {/* Active Tokens List */}
       <ActiveTokensList
@@ -232,7 +250,10 @@ export default function App() {
 
       {/* Main Canteen Menu */}
       <main className="grow">
-        <CanteenMenu onSelectItemForToken={handleSelectItemForToken} />
+        <CanteenMenu 
+          onSelectItemForToken={handleSelectItemForToken} 
+          activeCategoryOverride={activeMenuCategory}
+        />
 
         {/* Campus Information & Timings Section */}
         <CampusInfoSection />
@@ -240,6 +261,34 @@ export default function App() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Floating Bottom Quick-Token Action Bar */}
+      <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2">
+        {showBackToTop && (
+          <button
+            type="button"
+            onClick={scrollToTop}
+            className="w-11 h-11 rounded-2xl bg-white text-slate-700 shadow-xl border border-slate-200 flex items-center justify-center hover:bg-slate-100 hover:text-slate-900 active:scale-95 transition-all cursor-pointer"
+            title="Back to Top"
+          >
+            <ChevronUp className="w-5 h-5" />
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => handleOpenTokenModal()}
+          className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 active:scale-95 text-slate-950 font-black text-xs sm:text-sm shadow-2xl shadow-amber-400/30 border border-amber-200 flex items-center gap-2.5 transition-all cursor-pointer transform hover:-translate-y-0.5"
+        >
+          <Ticket className="w-4 h-4 text-slate-950" />
+          <span>Get Food Token</span>
+          {tokens.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-slate-950 text-amber-300 font-black text-xs animate-pulse">
+              {tokens.length}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* Modals */}
       <TokenGeneratorModal
